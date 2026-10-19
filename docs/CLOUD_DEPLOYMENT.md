@@ -129,15 +129,25 @@ gcloud iam service-accounts create math-mcp-runtime \
 
 ### 4. Deploy service account permissions
 
-Reuse the existing `github-actions-deploy` service account. It needs write
-access to the new Artifact Registry repository (its project-level `run.admin`
-and `iam.serviceAccountUser` on the runtime account carry over):
+Reuse the existing `github-actions-deploy` service account. Its project-level
+`run.admin` covers the new Cloud Run service too, but two grants are
+repository- or account-scoped and must be added fresh: write access to the
+new Artifact Registry repository, and permission to act as the new runtime
+service account (the existing `iam.serviceAccountUser` binding from the
+`assistant-mcp` setup is limited to `assistant-mcp-runtime@…` and does not
+carry over to `math-mcp-runtime@…`).
 
 ```bash
 gcloud artifacts repositories add-iam-policy-binding math-mcp-learning-server \
   --location=europe-west1 --project=rubenschulze-sandbox \
   --member="serviceAccount:github-actions-deploy@rubenschulze-sandbox.iam.gserviceaccount.com" \
   --role="roles/artifactregistry.writer"
+
+gcloud iam service-accounts add-iam-policy-binding \
+  math-mcp-runtime@rubenschulze-sandbox.iam.gserviceaccount.com \
+  --project=rubenschulze-sandbox \
+  --member="serviceAccount:github-actions-deploy@rubenschulze-sandbox.iam.gserviceaccount.com" \
+  --role="roles/iam.serviceAccountUser"
 ```
 
 ### 5. Shared secret in Secret Manager
