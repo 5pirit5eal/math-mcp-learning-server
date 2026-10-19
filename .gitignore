@@ -181,3 +181,6 @@ internal/
 
 # scripts/ dependencies (Playwright/Node)
 scripts/node_modules/
+
+# Vibe local config (contains local dev token)
+.vibe/
