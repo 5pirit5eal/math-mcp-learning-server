@@ -229,3 +229,63 @@ class TestEdgeCaseAST:
         """Attribute-based calls (math.__class__()) are rejected."""
         with pytest.raises(ValueError):
             safe_eval_expression(expr)
+
+
+# =============================================================================
+# Math constants: bare pi/e/tau resolve to their math-module values
+# =============================================================================
+
+
+class TestMathConstants:
+    """Verify that whitelisted math constants are usable as bare identifiers."""
+
+    @pytest.mark.parametrize(
+        "expr, expected",
+        [
+            ("pi", 3.141592653589793),
+            ("e", 2.718281828459045),
+            ("tau", 6.283185307179586),
+            ("2 * pi", 6.283185307179586),
+            ("e ** 2", 7.389056098930650),
+            ("pi * 2", 6.283185307179586),
+            ("cos(pi)", -1.0),
+            ("log(e)", 1.0),
+            ("2 * sin(pi/4) + sqrt(16)", 5.414213562373095),
+        ],
+    )
+    def test_constants_evaluate(self, expr: str, expected: float) -> None:
+        """Whitelisted constants evaluate to their math-module values."""
+        assert abs(safe_eval_expression(expr) - expected) < 1e-12
+
+    @pytest.mark.parametrize(
+        "expr, expected",
+        [
+            ("1e2", 100.0),
+            ("2E3", 2000.0),
+            ("1.5e-2", 0.015),
+            ("exp(1)", 2.718281828459045),
+        ],
+    )
+    def test_scientific_notation_not_mangled(self, expr: str, expected: float) -> None:
+        """Exponent markers inside float literals are never treated as constants."""
+        assert abs(safe_eval_expression(expr) - expected) < 1e-12
+
+    def test_constant_substitution_leaves_functions_intact(self) -> None:
+        """Substituted constant inside an already-prefixed function is not re-mangled."""
+        # exp(1) becomes math.exp(1); the 'e' inside 'math.exp' must stay put.
+        assert abs(safe_eval_expression("exp(pi)") - 23.140692632779267) < 1e-12
+
+    @pytest.mark.parametrize(
+        "expr",
+        [
+            "pie",
+            "eta",
+            "tau2",
+            "PI",
+            "E",
+        ],
+    )
+    def test_non_whitelisted_lookalikes_rejected(self, expr: str) -> None:
+        """Identifiers that merely contain or resemble constants are rejected."""
+        with pytest.raises(ValueError):
+            safe_eval_expression(expr)

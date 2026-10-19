@@ -88,7 +88,7 @@ async def calc_expression(
         str,
         Field(
             max_length=MAX_EXPRESSION_LENGTH,
-            description="Mathematical expression to evaluate. Supports +, -, *, /, **, and math functions (sin, cos, sqrt, log, etc.). Example: '2 * sin(pi/4) + sqrt(16)'",
+            description="Mathematical expression to evaluate. Supports +, -, *, /, **, math functions (sin, cos, sqrt, log, etc.), and constants (pi, e, tau). Example: '2 * sin(pi/4) + sqrt(16)'",
         ),
     ],
     ctx: SkipValidation[Context | None] = None,
@@ -97,6 +97,7 @@ async def calc_expression(
 
     Supported operations: +, -, *, /, **, ()
     Supported functions: sin, cos, tan, log, sqrt, abs, pow
+    Supported constants: pi, e, tau
 
     Note:
         Use this tool to evaluate a single mathematical expression. To compute descriptive statistics over a list of numbers, use the statistics tool instead.
@@ -104,7 +105,7 @@ async def calc_expression(
     Examples:
     - "2 + 3 * 4" → 14
     - "sqrt(16)" → 4.0
-    - "sin(3.14159/2)" → 1.0
+    - "2 * sin(pi/4) + sqrt(16)" → 5.414
     """
     logger.info(f"Calculating expression: {expression}")
 
