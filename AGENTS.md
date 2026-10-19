@@ -12,15 +12,18 @@ Python 3.14 + FastMCP 3.0 + Pydantic + uv + Ruff + Pyright
 
 ```text
 src/math_mcp/
-  server.py          # composition root, middleware, lifespan
+  server.py          # composition root, build_server(), middleware, healthz
+  auth.py            # shared-secret bearer token verifier (MCP_AUTH_TOKEN)
   tools/             # calculate, matrix, persistence, visualization
   persistence/       # models, storage, workspace
   resources.py       # MCP resources
   eval.py            # restricted eval (math module + abs only)
   visualization.py   # chart helpers
   settings.py
-tests/               # math, matrix, persistence, visualization, HTTP integration
+Dockerfile            # python:3.14-slim + uv, plotting/scientific extras
+tests/               # math, matrix, persistence, visualization, HTTP integration, auth, deploy config
 docs/ARCHITECTURE.md # Mermaid diagrams
+docs/CLOUD_DEPLOYMENT.md  # Cloud Run deploy guide + one-time GCP setup
 docs/adr/            # ADRs (NNN-title.md)
 ```
 
@@ -43,7 +46,10 @@ uv run ruff format src/ tests/
 
 ## Runtime Constraints
 
-- Deploys to FastMCP Cloud (Lambda); no module-level process spawning
+- Deploys to Google Cloud Run via `.github/workflows/deploy.yml` (Dockerfile image, WIF auth, digest-pinned deploy)
+- Transport selection via `MCP_TRANSPORT` (`stdio` default, `http` binds `0.0.0.0:$PORT`); `MCP_STATELESS_HTTP=false` restores stateful HTTP
+- HTTP auth: shared-secret bearer token from `MCP_AUTH_TOKEN` (Secret Manager `mcp-auth-token`); unset = no auth; `/healthz` always unauthenticated for the startup probe
+- Workspace persistence writes to `~/.math-mcp/` — instance-local and ephemeral on Cloud Run
 - `asyncio.to_thread()` for sync offloading; never `ProcessPoolExecutor` or `multiprocessing`
 
 ## Docs Conventions

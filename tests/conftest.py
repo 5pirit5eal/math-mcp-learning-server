@@ -1,5 +1,11 @@
 """Shared test fixtures for all tests."""
 
+import os
+
+# Tests exercise the unauthenticated server. A locally exported MCP_AUTH_TOKEN
+# must not flip the module-level server instance into auth mode at import time.
+os.environ.pop("MCP_AUTH_TOKEN", None)
+
 import asyncio
 
 import pytest

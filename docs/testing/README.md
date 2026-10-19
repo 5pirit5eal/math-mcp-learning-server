@@ -51,7 +51,9 @@ Run `uv run pytest --co -q` for current test count.
 | Persistence | 22 | workspace_save, workspace_load, workspace |
 | Visualization | 31 | plotting functions, charts, histograms |
 | Annotations | — | MCP annotation quality tests (per ADR-008) |
-| Agent Card | — | A2A agent card schema validation |
+| Auth | — | Shared-secret bearer token unit and HTTP enforcement tests |
+| Deploy Config | — | Cloud Run deploy workflow configuration tests |
+| Healthz | — | Platform probe endpoint tests |
 
 ## Test Structure
 

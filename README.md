@@ -20,9 +20,9 @@ See [CONTRIBUTING.md](https://github.com/clouatre-labs/math-mcp-learning-server/
 
 ## Quick Start
 
-### Cloud (No Installation)
+### Cloud (Google Cloud Run)
 
-Connect your MCP client to the hosted server:
+The server is deployed to Google Cloud Run (see the [Cloud Run Deployment Guide](https://github.com/clouatre-labs/math-mcp-learning-server/blob/main/docs/CLOUD_DEPLOYMENT.md)). Connect your MCP client with the shared secret bearer token:
 
 **Claude Desktop** (`claude_desktop_config.json`):
 
@@ -31,7 +31,8 @@ Connect your MCP client to the hosted server:
   "mcpServers": {
     "math-cloud": {
       "transport": "http",
-      "url": "https://math-mcp.fastmcp.app/mcp"
+      "url": "https://<service-url>/mcp",
+      "headers": { "Authorization": "Bearer <shared-secret>" }
     }
   }
 }
@@ -93,10 +94,29 @@ See [Usage Examples](https://github.com/clouatre-labs/math-mcp-learning-server/b
 
 ## Development
 
-See [CONTRIBUTING.md](https://github.com/clouatre-labs/math-mcp-learning-server/blob/main/CONTRIBUTING.md) for development setup, testing, and contribution guidelines.
+Requires Python 3.14 (pinned via `.python-version`) and [uv](https://docs.astral.sh/uv/).
+
+```bash
+uv sync --all-extras      # install all dependencies (incl. matplotlib/numpy)
+uv run math-mcp-learning-server          # stdio transport (local MCP clients)
+uv run pytest              # tests
+uv run ruff check .        # lint
+uv run ruff format .       # format
+uv run pyright src/        # type check
+```
+
+The HTTP transport with the shared-secret auth can be exercised locally:
+
+```bash
+MCP_TRANSPORT=http MCP_AUTH_TOKEN=<secret> uv run math-mcp-learning-server
+# serves http://0.0.0.0:8080/mcp (Bearer token required); /healthz stays open
+```
+
+See [CONTRIBUTING.md](https://github.com/clouatre-labs/math-mcp-learning-server/blob/main/CONTRIBUTING.md) for testing and contribution guidelines, and the [Cloud Run Deployment Guide](https://github.com/clouatre-labs/math-mcp-learning-server/blob/main/docs/CLOUD_DEPLOYMENT.md) for the deployment pipeline and one-time Google Cloud setup.
 
 ## Security
 
+- **Shared-Secret Bearer Auth** - HTTP deployments require `Authorization: Bearer <token>` (constant-time comparison, injected from Google Secret Manager)
 - **OpenSSF Best Practices Silver** - Fewer than 1% of open source projects reach this level
 - **REUSE/SPDX** - License compliance for all files
 - **Signed Commits** - GPG-signed commits required

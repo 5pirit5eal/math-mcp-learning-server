@@ -97,7 +97,10 @@ ignore = [
 max-complexity = 10
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S101", "F401"]  # Allow assert + unused imports in tests
+# Allow assert + unused imports + late imports in tests (conftest clears auth env
+# before importing the server, which requires imports after the os.environ.pop);
+# S105/S106: tests necessarily hardcode dummy secrets
+"tests/**/*.py" = ["S101", "F401", "E402", "S105", "S106"] 
 
 [tool.coverage.run]
 source = ["src"]

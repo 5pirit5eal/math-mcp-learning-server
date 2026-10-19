@@ -6,10 +6,10 @@ Uses FastMCP patterns with structured output and multi-transport support.
 """
 
 import logging
-from importlib.metadata import PackageNotFoundError
-from importlib.metadata import version as pkg_version
+import os
 
 from fastmcp import FastMCP
+from fastmcp.server.auth import TokenVerifier
 from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware
 from fastmcp.server.middleware.logging import StructuredLoggingMiddleware
 from fastmcp.server.middleware.rate_limiting import (
@@ -17,42 +17,34 @@ from fastmcp.server.middleware.rate_limiting import (
     SlidingWindowRateLimitingMiddleware,
 )
 from mcp.types import Completion, ResourceTemplateReference
+from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from math_mcp.agent_card import AgentCard, AgentSkill
+from math_mcp.auth import create_token_verifier
 from math_mcp.resources import resources_mcp
 from math_mcp.settings import RATE_LIMIT_PER_MINUTE
 from math_mcp.tools import calculate_mcp, matrix_mcp, persistence_mcp, visualization_mcp
 
-# === FASTMCP SERVER SETUP ===
+MCP_TRANSPORT = "MCP_TRANSPORT"
+MCP_STATELESS_HTTP = "MCP_STATELESS_HTTP"
+PORT = "PORT"
+DEFAULT_PORT = "8080"
 
-mcp = FastMCP(
-    name="Math Learning Server",
-    instructions=(
-        "Math Learning Server - use these tools for mathematical computation:\n\n"
-        "CALCULATE: Use `calculate` for arithmetic/algebra, `statistics` for lists, "
-        "`compound_interest` for finance (rate as decimal: 0.05 = 5%), "
-        "`convert_units` for unit conversion (length/weight/temperature).\n\n"
-        "MATRIX: Use `matrix_multiply`, `matrix_determinant`, `matrix_inverse`, "
-        "`matrix_transpose`, `matrix_eigenvalues` for linear algebra.\n\n"
-        "VISUALIZE: Use `plot_function`, `plot_histogram`, `plot_scatter`, "
-        "`plot_line_chart`, `plot_box_plot`, `plot_financial_line` for charts.\n\n"
-        "WORKSPACE: Use `save_calculation` to persist results, `load_variable` to retrieve. "
-        "Results survive server restarts. View all via math://workspace resource.\n\n"
-        "RESOURCES: math://functions (syntax reference), math://constants/{name} "
-        "(pi/e/golden_ratio/euler_gamma/sqrt2/sqrt3), math://catalog/tools (tool index)."
-    ),
-)
-
-# Mount sub-server tools using FastMCP composition pattern
-mcp.mount(calculate_mcp)
-mcp.mount(matrix_mcp)
-mcp.mount(persistence_mcp)
-mcp.mount(visualization_mcp)
-mcp.mount(resources_mcp)
+# Constants list must match resources.py get_math_constant keys
+_CONSTANTS = ["pi", "e", "golden_ratio", "euler_gamma", "sqrt2", "sqrt3"]
 
 
-# === RATE LIMITING MIDDLEWARE ===
+def resolve_stateless_http() -> bool:
+    """Resolve whether the HTTP transport serves requests statelessly.
+
+    Unset or any value other than case-insensitive ``false`` means stateless;
+    only ``MCP_STATELESS_HTTP=false`` restores stateful HTTP behavior. The
+    stdio transport is unaffected by this setting.
+
+    Returns:
+        bool: True when the HTTP transport should be stateless.
+    """
+    return os.environ.get(MCP_STATELESS_HTTP, "").strip().lower() != "false"
 
 
 def _log_rate_limit_violation(error: Exception, context) -> None:
@@ -61,123 +53,102 @@ def _log_rate_limit_violation(error: Exception, context) -> None:
         logging.warning(f"Rate limit exceeded: method={context.method}")
 
 
-# Add middleware in correct order: StructuredLogging -> ErrorHandling -> RateLimiting
-# Logging middleware placed first to capture all requests before other processing
-mcp.add_middleware(StructuredLoggingMiddleware(include_payloads=True))
-mcp.add_middleware(ErrorHandlingMiddleware(error_callback=_log_rate_limit_violation))
-if RATE_LIMIT_PER_MINUTE > 0:
-    mcp.add_middleware(
-        SlidingWindowRateLimitingMiddleware(max_requests=RATE_LIMIT_PER_MINUTE, window_minutes=1)
-    )
-    logging.info(f"Rate limiting enabled: {RATE_LIMIT_PER_MINUTE} requests/minute")
+# === SERVER ASSEMBLY ===
 
 
-# === ARGUMENT COMPLETIONS ===
+def build_server(auth: TokenVerifier | None = None) -> FastMCP:
+    """Assemble the FastMCP server from all tool and resource sub-servers.
 
-# Constants list must match resources.py get_math_constant keys
-_CONSTANTS = ["pi", "e", "golden_ratio", "euler_gamma", "sqrt2", "sqrt3"]
-
-
-@mcp.completion
-async def handle_completion(
-    ref: object,
-    argument: object,
-    context: object = None,
-) -> Completion | None:
-    """Provide tab-completions for math://constants/{constant} resource template."""
-    if not isinstance(ref, ResourceTemplateReference):
-        return None
-    if ref.uri != "math://constants/{constant}":
-        return None
-    prefix = getattr(argument, "value", "") or ""
-    matches = [c for c in _CONSTANTS if c.startswith(prefix)]
-    return Completion(values=matches)
-
-
-# === AGENT CARD ENDPOINT ===
-
-
-async def build_agent_card() -> AgentCard:
-    """Build A2A v0.3 agent card with dynamic tool introspection.
-
-    Introspects the MCP server's tools and builds a complete agent card
-    that describes this server's capabilities, skills, and interfaces.
-    This enables agent discovery and capability advertisement per A2A spec.
-
-    Returns:
-        AgentCard: Complete A2A v0.3 agent card with all required fields.
-    """
-    # Introspect tools from the MCP server
-    tools = await mcp.list_tools()
-
-    # Build skills from tools
-    skills: list[AgentSkill] = []
-    for tool in tools:
-        skill = AgentSkill.model_validate(
-            {
-                "id": tool.name,
-                "name": tool.name.replace("_", " ").title(),
-                "description": tool.description or f"Tool: {tool.name}",
-                "tags": ["mcp", "tool"],
-                "inputModes": ["application/json"],
-                "outputModes": ["application/json", "text/plain"],
-            }
-        )
-        skills.append(skill)
-
-    # Get dynamic version from package metadata
-    try:
-        version = pkg_version("math-mcp-learning-server")
-    except PackageNotFoundError:
-        # Fallback if package metadata is unavailable
-        version = "0.10.3"
-
-    # Build agent card with server metadata
-    agent_card = AgentCard.model_validate(
-        {
-            "protocolVersion": "0.3.0",
-            "name": "Math Learning Server",
-            "description": "Educational MCP server demonstrating FastMCP best practices for math operations, visualization, and persistent workspaces.",
-            "version": version,
-            "capabilities": {
-                "streaming": False,
-                "pushNotifications": False,
-                "stateTransitionHistory": False,
-            },
-            "defaultInputModes": ["application/json"],
-            "defaultOutputModes": ["application/json", "text/plain", "image/png"],
-            "skills": [s.model_dump(by_alias=True) for s in skills],
-            "documentationUrl": "https://github.com/clouatre-labs/math-mcp-learning-server",
-            "supportsExtendedAgentCard": False,
-        }
-    )
-
-    return agent_card
-
-
-# === A2A AGENT CARD ENDPOINT ===
-
-
-@mcp.custom_route("/.well-known/agent-card.json", methods=["GET"])
-async def agent_card_endpoint(request) -> JSONResponse:
-    """Serve A2A v0.3 agent card for server discovery.
-
-    This endpoint implements the A2A (Agent-to-Agent) v0.3 specification
-    for agent discovery. It provides metadata about the MCP server's
-    capabilities, skills, and interfaces in a standardized format.
-
-    The response uses camelCase JSON serialization as required by the
-    A2A specification, with Pydantic model_dump_json(by_alias=True).
+    ``auth`` supplies the token verifier directly (test seam); by default it
+    comes from the ``MCP_AUTH_TOKEN`` environment variable, which yields no
+    authentication when unconfigured.
 
     Args:
-        request: Starlette Request object (unused but required by route handler).
+        auth: Token verifier for the HTTP transport; None resolves it from
+        the MCP_AUTH_TOKEN environment variable (None means no auth when
+        the variable is unset or blank).
 
     Returns:
-        JSONResponse: A2A v0.3 agent card with server metadata and skills.
+        FastMCP: Fully assembled server instance.
     """
-    card = await build_agent_card()
-    # Use model_dump with by_alias=True for camelCase JSON serialization
-    return JSONResponse(card.model_dump(by_alias=True, mode="json"))
+    if auth is None:
+        auth = create_token_verifier()
+    mcp = FastMCP(
+        name="Math Learning Server",
+        auth=auth,
+        instructions=(
+            "Math Learning Server - use these tools for mathematical computation:\n\n"
+            "CALCULATE: Use `calculate` for arithmetic/algebra, `statistics` for lists, "
+            "`compound_interest` for finance (rate as decimal: 0.05 = 5%), "
+            "`convert_units` for unit conversion (length/weight/temperature).\n\n"
+            "MATRIX: Use `matrix_multiply`, `matrix_determinant`, `matrix_inverse`, "
+            "`matrix_transpose`, `matrix_eigenvalues` for linear algebra.\n\n"
+            "VISUALIZE: Use `plot_function`, `plot_histogram`, `plot_scatter`, "
+            "`plot_line_chart`, `plot_box_plot`, `plot_financial_line` for charts.\n\n"
+            "WORKSPACE: Use `save_calculation` to persist results, `load_variable` to retrieve. "
+            "Results survive server restarts. View all via math://workspace resource.\n\n"
+            "RESOURCES: math://functions (syntax reference), math://constants/{name} "
+            "(pi/e/golden_ratio/euler_gamma/sqrt2/sqrt3), math://catalog/tools (tool index)."
+        ),
+    )
+
+    # Mount sub-server tools using FastMCP composition pattern
+    mcp.mount(calculate_mcp)
+    mcp.mount(matrix_mcp)
+    mcp.mount(persistence_mcp)
+    mcp.mount(visualization_mcp)
+    mcp.mount(resources_mcp)
+
+    # Add middleware in correct order: StructuredLogging -> ErrorHandling -> RateLimiting
+    # Logging middleware placed first to capture all requests before other processing
+    mcp.add_middleware(StructuredLoggingMiddleware(include_payloads=True))
+    mcp.add_middleware(ErrorHandlingMiddleware(error_callback=_log_rate_limit_violation))
+    if RATE_LIMIT_PER_MINUTE > 0:
+        mcp.add_middleware(
+            SlidingWindowRateLimitingMiddleware(
+                max_requests=RATE_LIMIT_PER_MINUTE, window_minutes=1
+            )
+        )
+        logging.info(f"Rate limiting enabled: {RATE_LIMIT_PER_MINUTE} requests/minute")
+
+    # === ARGUMENT COMPLETIONS ===
+
+    @mcp.completion
+    async def handle_completion(
+        ref: object,
+        argument: object,
+        context: object = None,
+    ) -> Completion | None:
+        """Provide tab-completions for math://constants/{constant} resource template."""
+        if not isinstance(ref, ResourceTemplateReference):
+            return None
+        if ref.uri != "math://constants/{constant}":
+            return None
+        prefix = getattr(argument, "value", "") or ""
+        matches = [c for c in _CONSTANTS if c.startswith(prefix)]
+        return Completion(values=matches)
+
+    # === HEALTH ENDPOINT ===
+
+    @mcp.custom_route("/healthz", methods=["GET"])
+    async def healthz(request: Request) -> JSONResponse:
+        """Unauthenticated health endpoint for platform startup probes.
+
+        Intentionally checks no dependencies; Cloud Run holds back traffic
+        until the probe succeeds.
+
+        Args:
+            request: Starlette Request object (unused but required by route handler).
+
+        Returns:
+            JSONResponse: Static {"status": "ok"} payload.
+        """
+        return JSONResponse({"status": "ok"})
+
+    return mcp
+
+
+mcp = build_server()
 
 
 # === MAIN ENTRY POINT ===
@@ -186,21 +157,20 @@ async def agent_card_endpoint(request) -> JSONResponse:
 def main() -> None:
     """Main entry point supporting multiple transports.
 
-    Supports stdio and streamable-http transports. The A2A agent
-    card endpoint is automatically registered via @mcp.custom_route()
-    and available on all HTTP-based transports.
+    The transport is selected via ``MCP_TRANSPORT``: ``stdio`` (default) or
+    ``http``. The HTTP transport binds to ``0.0.0.0:$PORT`` (Cloud Run
+    convention, default 8080) and serves statelessly unless
+    ``MCP_STATELESS_HTTP=false``.
     """
-    import sys
-    from typing import Literal, cast
-
-    # Parse command line arguments for transport type
-    transport: Literal["stdio", "streamable-http"] = "stdio"  # default
-    if len(sys.argv) > 1:
-        if sys.argv[1] in ["stdio", "streamable-http"]:
-            transport = cast(Literal["stdio", "streamable-http"], sys.argv[1])
-
-    # Run the MCP server with the specified transport
-    mcp.run(transport=transport)
+    if os.environ.get(MCP_TRANSPORT, "stdio") == "http":
+        mcp.run(
+            transport="http",
+            host="0.0.0.0",  # noqa: S104 - Cloud Run requires binding all interfaces
+            port=int(os.environ.get(PORT, DEFAULT_PORT)),
+            stateless_http=resolve_stateless_http(),
+        )
+    else:
+        mcp.run(transport="stdio")
 
 
 if __name__ == "__main__":

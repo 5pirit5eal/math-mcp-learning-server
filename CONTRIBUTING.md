@@ -15,8 +15,8 @@
 git clone https://github.com/clouatre-labs/math-mcp-learning-server.git
 cd math-mcp-learning-server
 
-# Install dependencies and activate virtual environment
-uv sync --extra dev --extra plotting
+# Install dependencies (dev tools plus matplotlib/numpy) and activate virtual environment
+uv sync --all-extras
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Verify installation
@@ -26,8 +26,11 @@ uv run pytest -v
 ### Run the Server
 
 ```bash
-# Start the MCP server
-uv run python -m math_mcp.server
+# Start the MCP server (stdio transport)
+uv run math-mcp-learning-server
+
+# Or start the HTTP transport (as used on Cloud Run) with shared-secret auth
+MCP_TRANSPORT=http MCP_AUTH_TOKEN=dev-secret uv run math-mcp-learning-server
 ```
 
 ## Development Workflow
@@ -180,9 +183,9 @@ src/math_mcp/
     workspace.py         # Workspace management
   resources.py           # MCP resources
   settings.py            # Configuration
+  auth.py                # Shared-secret bearer token auth
   eval.py                # Restricted evaluation
   visualization.py       # Visualization helpers
-  agent_card.py          # A2A agent card
 tests/                   # Comprehensive test suite
 ROADMAP.md               # Ideas for later consideration
 ```

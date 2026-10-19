@@ -92,7 +92,9 @@ Complete user workflows spanning multiple tools.
 | **Persistence** | 22 | workspace_save, workspace_load, workspace management |
 | **Visualization** | 31 | plot_function, histograms, line/scatter charts, box plots |
 | **Annotations** | — | MCP annotation quality tests (per ADR-008) |
-| **Agent Card** | — | A2A agent card schema validation |
+| **Auth** | — | Shared-secret bearer token unit and HTTP enforcement tests |
+| **Deploy Config** | — | Cloud Run deploy workflow configuration tests |
+| **Healthz** | — | Platform probe endpoint tests |
 
 ### Coverage Targets
 
