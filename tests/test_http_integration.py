@@ -1,8 +1,8 @@
 """HTTP transport integration tests for math-mcp server.
 
 These tests verify the server works correctly over HTTP transport,
-mimicking real-world deployment scenarios like fastmcp.cloud.
-Run conditionally on release tags only.
+mimicking the Cloud Run deployment. They run in CI and in the deploy
+workflow's host and in-image verification jobs.
 """
 
 import json

@@ -63,4 +63,4 @@ uv run ruff format src/ tests/
 - Use `eval()` outside `eval.py`
 - Add dependencies without justification in the PR description
 - Implement features not specified in the assigned issue
-- Use `gh release create`; bump `pyproject.toml` version, GPG-sign the tag `v*.*.*`, and push -- the workflow publishes to PyPI and MCP Registry
+- Publish to PyPI or MCP registries; deployment to Cloud Run happens via `.github/workflows/deploy.yml` on push to `main` -- no release tags

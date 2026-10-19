@@ -1,16 +1,12 @@
-<!-- mcp-name: io.github.clouatre-labs/math-mcp-learning-server -->
-
 # math-mcp-learning-server
 
-[![PyPI](https://img.shields.io/pypi/v/math-mcp-learning-server?style=for-the-badge&color=3b82f6)](https://pypi.org/project/math-mcp-learning-server/)
-[![Python](https://img.shields.io/pypi/pyversions/math-mcp-learning-server?style=for-the-badge)](https://pypi.org/project/math-mcp-learning-server/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg?style=for-the-badge)](LICENSE)
 [![REUSE](https://img.shields.io/reuse/compliance/github.com/clouatre-labs/math-mcp-learning-server?style=for-the-badge)](https://api.reuse.software/info/github.com/clouatre-labs/math-mcp-learning-server)
 [![OpenSSF Best Practices](https://img.shields.io/cii/level/12334?style=for-the-badge)](https://www.bestpractices.dev/projects/12334)
 
 **Educational MCP server with 17 tools, persistent workspace, and cloud hosting.** Built with [FastMCP](https://gofastmcp.com) and the official [Model Context Protocol Python SDK](https://github.com/modelcontextprotocol/python-sdk).
 
-Available on the [MCP Registry](https://registry.modelcontextprotocol.io/) (`io.github.clouatre-labs/math-mcp-learning-server`) and [PyPI](https://pypi.org/project/math-mcp-learning-server/).
+Deployed to Google Cloud Run; not distributed through PyPI or MCP registries.
 
 ## Demo
 
@@ -19,8 +15,6 @@ Available on the [MCP Registry](https://registry.modelcontextprotocol.io/) (`io.
 See [CONTRIBUTING.md](https://github.com/clouatre-labs/math-mcp-learning-server/blob/main/CONTRIBUTING.md#demo-gif) for instructions to record your own demo.
 
 ## Quick Start
-
-### Cloud (Google Cloud Run)
 
 The server is deployed to Google Cloud Run (see the [Cloud Run Deployment Guide](https://github.com/clouatre-labs/math-mcp-learning-server/blob/main/docs/CLOUD_DEPLOYMENT.md)). Connect your MCP client with the shared secret bearer token:
 
@@ -37,21 +31,6 @@ The server is deployed to Google Cloud Run (see the [Cloud Run Deployment Guide]
   }
 }
 ```
-
-### Local Installation
-
-```json
-{
-  "mcpServers": {
-    "math": {
-      "command": "uvx",
-      "args": ["math-mcp-learning-server[scientific,plotting]"]
-    }
-  }
-}
-```
-
-For other installation options (basic, scientific-only, plotting-only), see [CONTRIBUTING.md](https://github.com/clouatre-labs/math-mcp-learning-server/blob/main/CONTRIBUTING.md).
 
 ## Tools
 
@@ -142,7 +121,6 @@ The `calc_expression` tool uses restricted `eval()` with a whitelist of allowed 
 - [Cloud Deployment Guide](https://github.com/clouatre-labs/math-mcp-learning-server/blob/main/docs/CLOUD_DEPLOYMENT.md)
 - [Usage Examples](https://github.com/clouatre-labs/math-mcp-learning-server/blob/main/docs/EXAMPLES.md)
 - [Contributing Guidelines](https://github.com/clouatre-labs/math-mcp-learning-server/blob/main/CONTRIBUTING.md)
-- [Maintainer Guide](https://github.com/clouatre-labs/math-mcp-learning-server/blob/main/.github/MAINTAINER_GUIDE.md)
 - [Roadmap](https://github.com/clouatre-labs/math-mcp-learning-server/blob/main/ROADMAP.md)
 - [Code of Conduct](https://github.com/clouatre-labs/math-mcp-learning-server/blob/main/CODE_OF_CONDUCT.md)
 - [License](https://github.com/clouatre-labs/math-mcp-learning-server/blob/main/LICENSE)

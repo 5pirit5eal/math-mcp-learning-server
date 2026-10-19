@@ -111,7 +111,7 @@ All pull requests run automated checks in parallel:
 
 All checks must pass before merge. Jobs run in parallel for faster feedback.
 
-HTTP integration tests run only on release tags (see [Maintainer Guide](https://github.com/clouatre-labs/math-mcp-learning-server/blob/main/.github/MAINTAINER_GUIDE.md)).
+HTTP integration tests run as part of the `deploy` workflow, on the host and inside the container image (see the [Cloud Run Deployment Guide](https://github.com/clouatre-labs/math-mcp-learning-server/blob/main/docs/CLOUD_DEPLOYMENT.md)).
 
 See [CI/CD Workflow](https://github.com/clouatre-labs/math-mcp-learning-server/blob/main/.github/workflows/ci.yml) for implementation details.
 
