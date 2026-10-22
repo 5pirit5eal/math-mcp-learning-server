@@ -22,13 +22,14 @@ pointers only.
 ## Commits
 
 Commit messages use the Conventional Commits types configured in
-`.releaserc`; semantic-release derives the version and the Cloud Run
-deploy runs only on a release. Ship Cloud Run changes with a releasable
-type; other types deliberately stay undeployed.
+`.releaserc` (enforced by commitlint in CI); semantic-release derives the
+version and the Cloud Run deploy runs only on a release. Ship Cloud Run
+changes with a releasable type; other types deliberately stay undeployed.
 
 ## Verification
 
-CI (`.github/workflows/ci.yml`) runs ruff, mypy, pytest, actionlint, and a
+CI (`.github/workflows/ci.yml`) runs ruff, mypy, pytest, actionlint,
+markdownlint, commitlint, and a
 Docker build with the test suite inside the image. Python tooling: uv +
 ruff + mypy + pytest (no pyright, no coverage gate — intentionally lean).
 `tests/test_deploy_config.py` asserts the deploy workflow's Cloud Run
