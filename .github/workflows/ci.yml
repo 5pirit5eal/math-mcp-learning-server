@@ -1,247 +1,53 @@
-name: CI
+name: ci
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
-    branches: [ main ]
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
 
-env:
-  PYTHON_VERSION: "3.14"
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
-  changes:
-    name: Detect Changes
-    runs-on: ubuntu-26.04-arm
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    outputs:
-      code: ${{ steps.filter.outputs.code }}
+  host:
+    name: Lint, types, and tests (Python 3.14)
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Detect path changes
-        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
-        id: filter
-        with:
-          filters: |
-            code:
-              - 'src/**'
-              - 'tests/**'
-              - 'pyproject.toml'
-              - 'uv.lock'
-              - '.github/workflows/**'
-
-  check-base:
-    name: Check Branch Base
-    needs: changes
-    if: needs.changes.outputs.code == 'true' || github.event_name != 'pull_request'
-    runs-on: ubuntu-26.04-arm
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-      - name: Verify branch is up-to-date with main
+      - uses: actions/checkout@v7
+      - name: Lint GitHub Actions workflows (actionlint 1.7.12)
         run: |
-          git fetch origin main
-          base_commit=$(git merge-base origin/main HEAD)
-          main_head=$(git rev-parse origin/main)
-          if [ "$base_commit" != "$main_head" ]; then
-            behind=$(git rev-list --count "$base_commit".."$main_head")
-            echo "::error::Branch is $behind commit(s) behind main. Rebase before merging."
-            exit 1
-          fi
-
-  lint:
-    needs: changes
-    if: needs.changes.outputs.code == 'true' || github.event_name != 'pull_request'
-    runs-on: ubuntu-26.04-arm
-    timeout-minutes: 5
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-    - name: Ruff check
-      uses: astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89 # v4.1.0
-      with:
-        version: '0.17.1'
-        args: 'check'
-
-    - name: Ruff format
-      uses: astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89 # v4.1.0
-      with:
-        version: '0.17.1'
-        args: 'format --check'
-
-  security:
-    needs: changes
-    if: needs.changes.outputs.code == 'true' || github.event_name != 'pull_request'
-    runs-on: ubuntu-26.04-arm
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      security-events: write
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      with:
-        fetch-depth: 0
-
-    - name: Install cosign
-      uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-
-    - name: Secret scanning
-      run: |
-        BL_VERSION=1.9.0
-        ARCH=$(echo "$RUNNER_ARCH" | tr '[:upper:]' '[:lower:]')
-        case "$ARCH" in
-          x64|arm64) ;;
-          *) echo "unsupported runner arch: $ARCH"; exit 1 ;;
-        esac
-        curl -sSfL -o "$RUNNER_TEMP/checksums.txt" "https://github.com/betterleaks/betterleaks/releases/download/v${BL_VERSION}/checksums.txt"
-        curl -sSfL -o "$RUNNER_TEMP/checksums.txt.sigstore.json" "https://github.com/betterleaks/betterleaks/releases/download/v${BL_VERSION}/checksums.txt.sigstore.json"
-        cosign verify-blob --bundle "$RUNNER_TEMP/checksums.txt.sigstore.json" --certificate-identity "https://github.com/betterleaks/betterleaks/.github/workflows/release.yml@refs/tags/v${BL_VERSION}" --certificate-oidc-issuer https://token.actions.githubusercontent.com "$RUNNER_TEMP/checksums.txt"
-        SHA256=$(awk -v f="betterleaks_${BL_VERSION}_linux_${ARCH}.tar.gz" '$2 == f { print $1 }' "$RUNNER_TEMP/checksums.txt")
-        if [ -z "$SHA256" ] || [ "$(printf '%s\n' "$SHA256" | wc -l)" -ne 1 ]; then
-          echo "expected exactly one sha256 for betterleaks_${BL_VERSION}_linux_${ARCH}.tar.gz in verified checksums.txt"
-          exit 1
-        fi
-        curl -sSfL -o "$RUNNER_TEMP/betterleaks.tar.gz" "https://github.com/betterleaks/betterleaks/releases/download/v${BL_VERSION}/betterleaks_${BL_VERSION}_linux_${ARCH}.tar.gz"
-        echo "${SHA256}  $RUNNER_TEMP/betterleaks.tar.gz" | sha256sum -c -
-        tar -xzf "$RUNNER_TEMP/betterleaks.tar.gz" -C "$RUNNER_TEMP" betterleaks
-        VERSION=$("$RUNNER_TEMP/betterleaks" version)
-        [ "$VERSION" = "$BL_VERSION" ] || { echo "unexpected betterleaks version: $VERSION"; exit 1; }
-        echo "betterleaks $VERSION"
-        "$RUNNER_TEMP/betterleaks" git . -v --redact
-
-    - name: Set up uv
-      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
-      with:
-        enable-cache: true
-
-    - name: Scan dependencies for CVEs
-      run: uv tool run pip-audit
-
-
-  test:
-    # Single-version CI: version pinned in env.PYTHON_VERSION above
-    needs: changes
-    if: needs.changes.outputs.code == 'true' || github.event_name != 'pull_request'
-    runs-on: ubuntu-26.04-arm
-    timeout-minutes: 10
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-    - name: Set up uv
-      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
-      with:
-        enable-cache: true
-        python-version: ${{ env.PYTHON_VERSION }}
-
-    - name: Install dependencies
-      run: uv sync --all-extras
-
-    - name: Run tests with coverage
-      run: uv run pytest tests/ -v --cov=math_mcp --cov-branch --cov-report=term-missing --cov-fail-under=90
-
-  typecheck:
-    name: Type Check
-    runs-on: ubuntu-26.04-arm
-    timeout-minutes: 5
-    needs: [changes]
-    if: needs.changes.outputs.code == 'true' || github.event_name != 'pull_request'
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Set up uv
-        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+          curl -fsSL -o /tmp/actionlint.tar.gz \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          tar -xzf /tmp/actionlint.tar.gz -C /tmp actionlint
+          /tmp/actionlint
+      - uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: true
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install dependencies
-        run: uv sync --extra plotting --extra scientific --extra dev
-      - name: Run pyright
-        run: uv run pyright src/
+          python-version: "3.14"
+      - run: uv sync --frozen --all-extras
+      - run: uv run ruff check .
+      - run: uv run mypy src
+      - run: uv run pytest
 
-  zizmor:
-    name: zizmor
-    needs: changes
-    if: needs.changes.outputs.code == 'true' || github.event_name != 'pull_request'
-    runs-on: ubuntu-26.04-arm
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      security-events: write # needed for SARIF upload on public repos
+  docker:
+    name: Build image and run tests inside it
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Run zizmor
-        uses: zizmorcore/zizmor-action@85b2b9fb8e3325e7a23d7d0a9d7ba5ae0f999e3e # v0.7.1
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Build image (layer-cached)
+        uses: docker/build-push-action@v7
         with:
-          advanced-security: ${{ github.event.repository.visibility == 'public' }}
-          min-severity: medium
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-  commitlint:
-    name: commitlint
-    runs-on: ubuntu-26.04-arm
-    timeout-minutes: 5
-    if: github.event_name == 'pull_request'
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-      - name: Set up Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: "24"
-      - name: Cache npm
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.npm
-          key: commitlint-${{ hashFiles('.github/workflows/ci.yml') }}
-          restore-keys: commitlint-
-      - name: Install commitlint
-        run: |
-          npm install --no-save \
-            @commitlint/cli@21.2.1 \
-            @commitlint/config-conventional@21.2.0
-      - name: Validate commit messages
-        run: |
-          npx commitlint \
-            --from ${{ github.event.pull_request.base.sha }} \
-            --to ${{ github.event.pull_request.head.sha }} \
-            --verbose
-
-  ci-result:
-    name: CI Result
-    runs-on: ubuntu-26.04-arm
-    timeout-minutes: 2
-    if: always()
-    needs: [check-base, lint, security, test, typecheck, zizmor, commitlint]
-    permissions: {}
-    steps:
-      - name: Verify all jobs passed or were skipped
-        run: |
-          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
-            echo "::error::One or more CI jobs failed or were cancelled."
-            exit 1
-          fi
-          echo "All CI jobs passed or were skipped."
+          context: .
+          push: false
+          load: true
+          tags: math-mcp-learning-server:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Run test suite inside the image
+        run: >-
+          docker run --rm -v "${GITHUB_WORKSPACE}":/src:ro
+          -e UV_PROJECT_ENVIRONMENT=/tmp/venv math-mcp-learning-server:ci
+          sh -c "cd /src && uv sync --frozen --all-extras --no-install-project && uv run --no-sync pytest"

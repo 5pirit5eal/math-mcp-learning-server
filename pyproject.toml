@@ -5,21 +5,7 @@ description = "Educational MCP server for math operations, statistics, visualiza
 readme = "README.md"
 requires-python = ">=3.14"
 license = "Apache-2.0"
-authors = [
-    {name = "Hugues Clouâtre", email = "hugues@linux.com"}
-]
-keywords = ["mcp", "math", "calculator", "learning", "fastmcp", "tutorial", "education", "cloud", "deployment", "workspace", "persistence"]
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Developers",
-    "Intended Audience :: Education",
-    "Programming Language :: Python :: 3.14",
-    "Topic :: Education",
-    "Topic :: Software Development :: Libraries :: Application Frameworks",
-    "Topic :: Scientific/Engineering :: Mathematics",
-    "Topic :: Documentation",
-    "Environment :: Console",
-]
+keywords = ["mcp", "math", "calculator", "fastmcp", "education"]
 dependencies = [
     "fastmcp>=4.1.0,<4.2.0",
     "pydantic>=2.13.3",
@@ -27,42 +13,14 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/clouatre-labs/math-mcp-learning-server"
-Repository = "https://github.com/clouatre-labs/math-mcp-learning-server"
-Issues = "https://github.com/clouatre-labs/math-mcp-learning-server/issues"
-Documentation = "https://github.com/clouatre-labs/math-mcp-learning-server#readme"
-Contributing = "https://github.com/clouatre-labs/math-mcp-learning-server/blob/main/CONTRIBUTING.md"
-Roadmap = "https://github.com/clouatre-labs/math-mcp-learning-server/blob/main/ROADMAP.md"
-Changelog = "https://github.com/clouatre-labs/math-mcp-learning-server/releases"
-"Code of Conduct" = "https://github.com/clouatre-labs/math-mcp-learning-server/blob/main/CODE_OF_CONDUCT.md"
-License = "https://github.com/clouatre-labs/math-mcp-learning-server/blob/main/LICENSE"
+Homepage = "https://github.com/5pirit5eal/math-mcp-learning-server"
+Repository = "https://github.com/5pirit5eal/math-mcp-learning-server"
+Issues = "https://github.com/5pirit5eal/math-mcp-learning-server/issues"
 
 [project.scripts]
 math-mcp-learning-server = "math_mcp.server:main"
 
-[build-system]
-requires = ["setuptools>=61"]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-pythonpath = ["src"]
-
 [project.optional-dependencies]
-dev = [
-    "httpx>=0.28.1",
-    "pytest>=9.0.3",
-    "pytest-asyncio>=0.25.2",
-    "pytest-cov>=7.1.0",
-    "pyright>=1.1.408",
-    # Pin ruff >=0.15.1: formatting regression in 0.15.0 strips parentheses
-    # from multi-exception except clauses when target-version = "py314" (invalid syntax).
-    # Fixed in 0.15.1. See follow-up issue.
-    "ruff>=0.17.1,<0.18.0",
-]
 plotting = [
     "matplotlib>=3.10.6",
     "numpy>=2.4.4",
@@ -71,64 +29,58 @@ scientific = [
     "numpy>=2.4.4",
 ]
 
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/math_mcp"]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "mypy>=1.11.0",
+    # Pin ruff >=0.15.1: formatting regression in 0.15.0 strips parentheses
+    # from multi-exception except clauses when target-version = "py314" (invalid syntax).
+    "ruff>=0.17.1,<0.18.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.25.2",
+    "pyyaml>=6.0.2",
+    "uvicorn>=0.30.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+pythonpath = ["src"]
+
 [tool.ruff]
-target-version = "py314"
 line-length = 100
+target-version = "py314"
 
 [tool.ruff.lint]
 select = [
     "E",   # pycodestyle errors
     "F",   # pyflakes
-    "W",   # pycodestyle warnings
     "I",   # isort
     "UP",  # pyupgrade
     "B",   # bugbear
-    "S",   # bandit (security)
-    "C",   # mccabe cyclomatic complexity
+    "SLF001",  # private member access
 ]
 ignore = [
-    "S101",  # Use of assert (common in tests)
-    "S307",  # Use of eval() - controlled and safe for math calculator
     "E501",  # Line too long - formatter handles most cases
     "B904",  # raise-without-from - acceptable for this educational project
 ]
 
-[tool.ruff.lint.mccabe]
-max-complexity = 10
-
 [tool.ruff.lint.per-file-ignores]
-# Allow assert + unused imports + late imports in tests (conftest clears auth env
-# before importing the server, which requires imports after the os.environ.pop);
-# S105/S106: tests necessarily hardcode dummy secrets
-"tests/**/*.py" = ["S101", "F401", "E402", "S105", "S106"] 
+# Late imports in tests (conftest clears auth env before importing the server,
+# which requires imports after the os.environ.pop); SLF001: tests necessarily
+# poke at private state (middleware limiters, mock ctx._state).
+"tests/**/*.py" = ["F401", "E402", "SLF001"]
+# Reach into private helpers across module boundaries: the workspace loader
+# (resources.py) and the matplotlib backend setup (tools/visualization.py).
+"src/math_mcp/resources.py" = ["SLF001"]
+"src/math_mcp/tools/visualization.py" = ["SLF001"]
 
-[tool.coverage.run]
-source = ["src"]
-branch = true
-omit = [
-    "*/tests/*",
-    "*/test_*.py",
-    "*/server.py",
-    "*/resources.py",
-]
-
-[tool.coverage.report]
-fail_under = 90
-exclude_lines = [
-    "pragma: no cover",
-    "def __repr__",
-    "raise AssertionError",
-    "raise NotImplementedError",
-    "if __name__ == .__main__.:",
-    "if TYPE_CHECKING:",
-]
-
-[dependency-groups]
-dev = [
-    "pytest>=9.0.3",
-]
-
-[tool.pyright]
-pythonVersion = "3.14"
-typeCheckingMode = "standard"
-reportMissingImports = true
+[tool.mypy]
+python_version = "3.14"

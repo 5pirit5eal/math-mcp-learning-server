@@ -1,0 +1,98 @@
+schema: spec-driven
+context: |
+  Language: en
+  All artifacts must be written in English.
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+rules:
+  tasks:
+    - >-
+      Test-Driven Development (TDD) is mandatory for every implementation
+      task: write the failing test first, then only enough code to pass it.
+    - >-
+      Configuration and workflow files (e.g. .github/workflows/*.yml,
+      .releaserc, Dockerfile) are exempt from the TDD requirement. They are
+      validated by review (manual or agent) and automated linters, not by
+      tests that assert their contents.
+    - >-
+      For every task, declare whether it is parallelizable or blocked: group
+      tasks that can be implemented independently of each other into a
+      parallelizable batch, and state for each remaining task which tasks
+      block it. Base this on real dependencies (shared files, interfaces
+      other tasks consume, ordering the spec demands), not on guesswork.
+      Tasks that mutate the dependency environment (uv.lock, .venv) are not
+      parallelizable with tasks that run the test suite or linters - treat
+      the environment as a shared file.
+    - >-
+      Tests SHALL verify observable behavior through the public interfaces of
+      the system (tools, endpoints, commands, public functions), never through
+      implementation details.
+    - >-
+      Configuration keys and other cross-module strings (environment variable
+      names, secret names, CLI flags) SHALL be defined once as named constants
+      in the module that owns them; tests import these constants instead of
+      duplicating the strings as literals.
+    - >-
+      Derive test cases from the change's requirements and scenarios: one
+      scenario -> one failing test -> one minimal implementation -> repeat.
+    - >-
+      Expected values in tests SHALL come from the spec, a scenario, or a
+      known-good example - never recomputed the same way the code computes them.
+    - >-
+      Refactoring is not part of the test-first cycle; it belongs to review.
+  design:
+    - >-
+      Document which public interfaces of the system the tests will target and
+      what each interface does and does not cover.
+    - >-
+      Design decisions that rely on library or framework behavior MUST be
+      verified empirically against the locked dependency version (uv.lock),
+      not against documentation of a different version range, before the
+      design is finalized.
+    - >-
+      Designs that wire configuration into a deployment MUST enumerate value
+      -> delivery (env var, secret, repository variable) for every value the
+      code requires to activate a feature; the rollout delivers the complete
+      activation contract, not a subset.
+  proposal:
+    - >-
+      The Impact section MUST enumerate affected documentation surfaces
+      (e.g. README.md) whenever the change alters project structure, modules,
+      or public behavior.
+operations:
+  apply:
+    guidance:
+      - >-
+        Implement test-first: write the failing test, run it to confirm it
+        fails for the expected reason, then write the minimal implementation.
+      - >-
+        Run the narrow relevant test first, then the wider suite before marking
+        a task complete. Keep test summaries concise.
+      - >-
+        Only mark a task complete when its tests pass.
+      - >-
+        On completion, run the gap-analysis review described in the apply
+        skill and present its findings to the user for approval, then give
+        the one-line retro recommendation (Retro empfohlen / Kein Retro
+        notwendig). The retro itself (openspec-retro skill) is only run when
+        the user triggers it manually.
+      - >-
+        When an implementation legitimately deviates from a task's described
+        mechanism, update the task wording (or add a superseding task) before
+        checking it off, so checked text and delivered code agree.
+      - >-
+        When a change renames or removes a symbol referenced in AGENTS.md,
+        update the reference in the same change.
+  archive:
+    guidance:
+      - >-
+        Before archiving, capture any strategically critical information from
+        proposal, design, and tasks into the main spec or AGENTS.md.
+      - >-
+        Delete transient planning artifacts after the sync. When the sync was
+        performed and verified, delete the change's specs too - their content
+        lives in the main specs; only unsynced specs persist as the surviving
+        copy.
+      - >-
+        After the retention cleanup, remove archived change directories left
+        empty or metadata-only, and the archive directory itself when empty -
+        no archive remains once nothing survives the cleanup.

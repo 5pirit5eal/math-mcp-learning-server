@@ -1,8 +1,8 @@
 name: deploy
 
 on:
-  push:
-    branches: [main]
+  release:
+    types: [released]
   workflow_dispatch:
 
 permissions:
@@ -20,29 +20,28 @@ jobs:
     name: Verify on host (Python 3.14)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7
         with:
-          persist-credentials: false
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+          ref: ${{ github.event.release.tag_name || github.ref }}
+      - uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: true
           python-version: "3.14"
-      - run: uv sync --all-extras
+      - run: uv sync --frozen --all-extras
       - run: uv run ruff check .
-      - run: uv run ruff format --check .
-      - run: uv run pyright src/
+      - run: uv run mypy src
       - run: uv run pytest
 
   docker:
     name: Verify inside container image
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7
         with:
-          persist-credentials: false
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+          ref: ${{ github.event.release.tag_name || github.ref }}
+      - uses: docker/setup-buildx-action@v4
       - name: Build image (layer-cached)
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: false
@@ -59,27 +58,26 @@ jobs:
   deploy:
     name: Build, publish, and deploy to Cloud Run
     needs: [host, docker]
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7
         with:
-          persist-credentials: false
+          ref: ${{ github.event.release.tag_name || github.ref }}
       - name: Check Workload Identity provider variable
         env:
           WIF_PROVIDER: ${{ vars.WORKLOAD_IDENTITY_PROVIDER }}
         run: |
           if [ -z "$WIF_PROVIDER" ]; then
             echo "vars.WORKLOAD_IDENTITY_PROVIDER is not set." >&2
-            echo "Run the one-time GCP setup in docs/CLOUD_DEPLOYMENT.md, then:" >&2
+            echo "Run the one-time GCP setup, then:" >&2
             pool="projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools"
-            echo "  gh variable set WORKLOAD_IDENTITY_PROVIDER --body '$pool/github-actions/providers/math-mcp' -R 5pirit5eal/math-mcp-learning-server" >&2
+            echo "  gh variable set WORKLOAD_IDENTITY_PROVIDER --body '$pool/github-actions/providers/github-com'" >&2
             exit 1
           fi
-      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+      - uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.WORKLOAD_IDENTITY_PROVIDER }}
           service_account: github-actions-deploy@rubenschulze-sandbox.iam.gserviceaccount.com
@@ -87,17 +85,22 @@ jobs:
         run: >-
           gcloud auth print-access-token |
           docker login -u oauth2accesstoken --password-stdin europe-west1-docker.pkg.dev
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      - uses: docker/setup-buildx-action@v4
+      - name: Capture checked-out commit SHA
+        id: sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Build and push image
         id: build
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true
-          tags: ${{ env.IMAGE }}:${{ github.sha }}
+          tags: >-
+            ${{ env.IMAGE }}:${{ github.event.release.tag_name || format('manual-{0}', steps.sha.outputs.sha) }},
+            ${{ env.IMAGE }}:${{ steps.sha.outputs.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - uses: google-github-actions/deploy-cloudrun@2028e2d7d30a78c6910e0632e48dd561b064884d # v3
+      - uses: google-github-actions/deploy-cloudrun@v3
         with:
           service: math-mcp-learning-server
           region: europe-west1

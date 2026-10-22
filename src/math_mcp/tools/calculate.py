@@ -4,7 +4,8 @@ FastMCP sub-server for mathematical calculations, statistics, and unit conversio
 """
 
 import logging
-from typing import Annotated
+from collections.abc import Callable
+from typing import Annotated, Any
 
 from fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
@@ -177,7 +178,7 @@ async def calc_statistics(
     if ctx:
         await ctx.report_progress(1, 2, "Computing statistics")
 
-    operations = {
+    operations: dict[str, Callable[[list[float]], Any]] = {
         "mean": stats.mean,
         "median": stats.median,
         "mode": stats.mode,
