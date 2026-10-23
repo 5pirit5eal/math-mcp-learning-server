@@ -18,7 +18,6 @@ __all__ = [
     "TOPIC_KEYWORDS",
     "TEMP_CONVERSIONS",
     "EXPRESSION_TIMEOUT_SECONDS",
-    "RATE_LIMIT_PER_MINUTE",
     "MAX_EXPRESSION_LENGTH",
     "MAX_STRING_PARAM_LENGTH",
     "MAX_ARRAY_SIZE",
@@ -33,7 +32,6 @@ class MathMCPSettings(BaseSettings):
     """Environment-based configuration with automatic validation."""
 
     math_timeout: float = 5.0
-    mcp_rate_limit_per_minute: int = Field(default=100, ge=0)
     max_expression_length: int = Field(default=500, ge=0)
     max_string_param_length: int = Field(default=100, ge=0)
     max_array_size: int = Field(default=10000, ge=0)
@@ -107,7 +105,6 @@ _settings = MathMCPSettings()
 # === DERIVED CONSTANTS (from shared _settings instance) ===
 
 EXPRESSION_TIMEOUT_SECONDS: Final[float] = _settings.math_timeout
-RATE_LIMIT_PER_MINUTE: Final[int] = _settings.mcp_rate_limit_per_minute
 MAX_EXPRESSION_LENGTH: Final[int] = _settings.max_expression_length
 MAX_STRING_PARAM_LENGTH: Final[int] = _settings.max_string_param_length
 MAX_ARRAY_SIZE: Final[int] = _settings.max_array_size

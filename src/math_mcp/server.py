@@ -5,24 +5,18 @@ Educational MCP server demonstrating all three MCP pillars: Tools, Resources, an
 Uses FastMCP patterns with structured output and multi-transport support.
 """
 
-import logging
 import os
 
 from fastmcp import FastMCP
 from fastmcp.server.auth import TokenVerifier
 from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware
 from fastmcp.server.middleware.logging import StructuredLoggingMiddleware
-from fastmcp.server.middleware.rate_limiting import (
-    RateLimitError,
-    SlidingWindowRateLimitingMiddleware,
-)
 from mcp.types import Completion, ResourceTemplateReference
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from math_mcp.auth import create_token_verifier
 from math_mcp.resources import resources_mcp
-from math_mcp.settings import RATE_LIMIT_PER_MINUTE
 from math_mcp.tools import calculate_mcp, matrix_mcp, persistence_mcp, visualization_mcp
 
 MCP_TRANSPORT = "MCP_TRANSPORT"
@@ -45,12 +39,6 @@ def resolve_stateless_http() -> bool:
         bool: True when the HTTP transport should be stateless.
     """
     return os.environ.get(MCP_STATELESS_HTTP, "").strip().lower() != "false"
-
-
-def _log_rate_limit_violation(error: Exception, context) -> None:
-    """Log rate limit violations for monitoring."""
-    if isinstance(error, RateLimitError):
-        logging.warning(f"Rate limit exceeded: method={context.method}")
 
 
 # === SERVER ASSEMBLY ===
@@ -99,17 +87,10 @@ def build_server(auth: TokenVerifier | None = None) -> FastMCP:
     mcp.mount(visualization_mcp)
     mcp.mount(resources_mcp)
 
-    # Add middleware in correct order: StructuredLogging -> ErrorHandling -> RateLimiting
+    # Add middleware in correct order: StructuredLogging -> ErrorHandling
     # Logging middleware placed first to capture all requests before other processing
     mcp.add_middleware(StructuredLoggingMiddleware(include_payloads=True))
-    mcp.add_middleware(ErrorHandlingMiddleware(error_callback=_log_rate_limit_violation))
-    if RATE_LIMIT_PER_MINUTE > 0:
-        mcp.add_middleware(
-            SlidingWindowRateLimitingMiddleware(
-                max_requests=RATE_LIMIT_PER_MINUTE, window_minutes=1
-            )
-        )
-        logging.info(f"Rate limiting enabled: {RATE_LIMIT_PER_MINUTE} requests/minute")
+    mcp.add_middleware(ErrorHandlingMiddleware())
 
     # === ARGUMENT COMPLETIONS ===
 
