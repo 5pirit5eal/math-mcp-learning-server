@@ -1,6 +1,6 @@
 [project]
 name = "math-mcp-learning-server"
-version = "1.0.0"
+version = "2.0.0"
 description = "Educational MCP server for math operations, statistics, visualization, and persistent workspaces. Built with FastMCP."
 readme = "README.md"
 requires-python = ">=3.14"
