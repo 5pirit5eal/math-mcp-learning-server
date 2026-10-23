@@ -805,7 +805,10 @@ async def test_statistics_with_progress_ctx() -> None:
     from math_mcp.tools.calculate import calc_statistics
 
     mock_ctx = AsyncMock()
-    result = await calc_statistics.raw_function([1.0, 2.0, 3.0], "mean", mock_ctx)
+    # raw_function is attached dynamically by the fastmcp @tool decorator.
+    result = await calc_statistics.raw_function(  # type: ignore[attr-defined]
+        [1.0, 2.0, 3.0], "mean", mock_ctx
+    )
     assert result.result == 2.0
     mock_ctx.report_progress.assert_called()
 
@@ -819,7 +822,10 @@ async def test_statistics_invalid_op_with_ctx(caplog) -> None:
 
     caplog.set_level(logging.WARNING)
     with pytest.raises(ValueError, match="Invalid operation"):
-        await calc_statistics.raw_function([1.0, 2.0], "invalid_op", None)
+        # raw_function is attached dynamically by the fastmcp @tool decorator.
+        await calc_statistics.raw_function(  # type: ignore[attr-defined]
+            [1.0, 2.0], "invalid_op", None
+        )
     assert any(r.levelno == logging.WARNING for r in caplog.records)
     assert any("Invalid operation" in r.message for r in caplog.records)
 

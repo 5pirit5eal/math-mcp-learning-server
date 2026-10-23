@@ -36,7 +36,7 @@ async def test_all_params_have_descriptions() -> None:
     tools = await _get_tools()
     violations: list[str] = []
     for tool in tools:
-        schema = tool.inputSchema or {}
+        schema = tool.input_schema or {}
         props = schema.get("properties", {})
         required = set(schema.get("required", []))
         for param_name, param_def in props.items():
@@ -61,7 +61,7 @@ async def test_no_bare_string_params_without_description() -> None:
     tools = await _get_tools()
     violations: list[str] = []
     for tool in tools:
-        schema = tool.inputSchema or {}
+        schema = tool.input_schema or {}
         props = schema.get("properties", {})
         for param_name, param_def in props.items():
             if param_def.get("type") == "string" and not param_def.get("description", "").strip():
@@ -92,7 +92,7 @@ async def test_enum_like_params_have_examples() -> None:
         if tool is None:
             violations.append(f"{tool_name} (tool not found)")
             continue
-        props = (tool.inputSchema or {}).get("properties", {})
+        props = (tool.input_schema or {}).get("properties", {})
         for param_name in params:
             param_def = props.get(param_name, {})
             has_examples = bool(param_def.get("examples"))

@@ -9,7 +9,16 @@ import json
 
 import pytest
 from fastmcp import Client
+from fastmcp.client.client import CallToolResult
 from mcp import MCPError
+from mcp.types import TextContent
+
+
+def first_text(result: CallToolResult) -> str:
+    """Return the text of the first content block (the server only returns text)."""
+    content = result.content[0]
+    assert isinstance(content, TextContent)
+    return content.text
 
 
 async def test_http_liveness(http_client: Client) -> None:
@@ -22,7 +31,7 @@ async def test_http_calculate_basic(http_client: Client) -> None:
     """Test basic calculation over HTTP."""
     result = await http_client.call_tool("calc_expression", {"expression": "2 + 2"})
     assert len(result.content) > 0
-    text = result.content[0].text
+    text = first_text(result)
     data = json.loads(text)
     assert data["expression"] == "2 + 2"
     assert data["result"] == 4.0
@@ -32,7 +41,7 @@ async def test_http_calculate_complex(http_client: Client) -> None:
     """Test complex calculation over HTTP."""
     result = await http_client.call_tool("calc_expression", {"expression": "sqrt(16) * 3"})
     assert len(result.content) > 0
-    text = result.content[0].text
+    text = first_text(result)
     data = json.loads(text)
     assert data["result"] == 12.0
 
@@ -49,7 +58,7 @@ async def test_http_statistics_mean(http_client: Client) -> None:
         "calc_statistics", {"operation": "mean", "numbers": [1, 2, 3, 4, 5]}
     )
     assert len(result.content) > 0
-    text = result.content[0].text
+    text = first_text(result)
     data = json.loads(text)
     assert data["result"] == 3.0
     assert data["operation"] == "mean"
@@ -61,7 +70,7 @@ async def test_http_statistics_median(http_client: Client) -> None:
         "calc_statistics", {"operation": "median", "numbers": [1, 2, 3, 4, 5]}
     )
     assert len(result.content) > 0
-    text = result.content[0].text
+    text = first_text(result)
     data = json.loads(text)
     assert data["result"] == 3.0
     assert data["operation"] == "median"
@@ -74,7 +83,7 @@ async def test_http_compound_interest(http_client: Client) -> None:
         {"principal": 1000, "rate": 0.05, "time": 10, "compounds_per_year": 12},
     )
     assert len(result.content) > 0
-    text = result.content[0].text
+    text = first_text(result)
     data = json.loads(text)
     assert "final_amount" in data
     assert data["principal"] == 1000
@@ -86,7 +95,7 @@ async def test_http_convert_units_length(http_client: Client) -> None:
         "calc_units", {"value": 1, "from_unit": "m", "to_unit": "cm", "unit_type": "length"}
     )
     assert len(result.content) > 0
-    text = result.content[0].text
+    text = first_text(result)
     data = json.loads(text)
     assert data["converted_value"] == 100.0
 
@@ -123,7 +132,7 @@ async def test_http_calculate_parametrized(
     """Test multiple calculations with parametrization over HTTP."""
     result = await http_client.call_tool("calc_expression", {"expression": expression})
     assert len(result.content) > 0
-    assert expected_in_text in result.content[0].text
+    assert expected_in_text in first_text(result)
 
 
 async def test_http_list_tools(http_client: Client) -> None:
@@ -141,6 +150,6 @@ async def test_http_response_serialization(http_client: Client) -> None:
         "calc_statistics", {"operation": "std_dev", "numbers": [1, 2, 3, 4, 5]}
     )
     assert len(result.content) > 0
-    text = result.content[0].text
+    text = first_text(result)
     assert text is not None
     assert len(text) > 0

@@ -7,6 +7,7 @@ import os
 os.environ.pop("MCP_AUTH_TOKEN", None)
 
 import asyncio
+from collections.abc import AsyncGenerator
 
 import pytest
 from fastmcp import Client
@@ -17,7 +18,7 @@ from math_mcp.server import mcp
 
 
 @pytest.fixture
-async def http_server() -> str:
+async def http_server() -> AsyncGenerator[str]:
     """Start MCP server in-process with HTTP transport for testing.
 
     This fixture creates a real HTTP server instance, allowing tests
@@ -51,7 +52,7 @@ async def http_server() -> str:
 
 
 @pytest.fixture
-async def http_client(http_server: str) -> Client:
+async def http_client(http_server: str) -> AsyncGenerator[Client]:
     """Connect to HTTP server via StreamableHttpTransport.
 
     Args:
